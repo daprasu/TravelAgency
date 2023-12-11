@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq;
 using TravelAgency.Core.DTOs;
 using TravelAgency.Core.Entities;
@@ -27,11 +28,11 @@ namespace TravelAngecy.Infraestructure.Repositories
             _context.Reservation.Add(reservation);
         }
 
-        public dynamic GetReservationByUserId(int userId)
+        public List<Reservation> GetReservationByUserId(int userId)
         {
             var listReservation = _context.Reservation.Include(x => x.Room).ThenInclude(x => x.Hotel)
                         .Include(x => x.Room).ThenInclude(x => x.RoomType)
-                        .Where(x => x.Room.Hotel.UserId.Equals(userId));
+                        .Where(x => x.Room.Hotel.UserId.Equals(userId)).ToList();
             return listReservation;
         }
         public Reservation GetReservationByReservationId(int reservationId)

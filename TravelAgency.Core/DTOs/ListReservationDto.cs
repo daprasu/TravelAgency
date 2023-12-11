@@ -5,9 +5,6 @@ namespace TravelAgency.Core.DTOs
 {
     public partial class ListReservationDto
     {
-        /// <summary>
-        /// </summary>
-        /// <example>1</example>
         public int? Id { get; set; }
         public string HotelName { get; set; }
         public int? Cost { get; set; }

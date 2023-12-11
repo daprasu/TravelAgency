@@ -55,7 +55,7 @@ namespace TravelAngecy.Infraestructure.Application
             }
             else
             {
-                response.ResponseMessage("The user could not access this function", false);
+                response.ResponseMessage("This user could not access this function", false);
                 return response;
             }
         }

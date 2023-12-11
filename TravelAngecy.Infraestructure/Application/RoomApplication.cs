@@ -72,28 +72,15 @@ namespace TravelAngecy.Infraestructure.Application
             }
             try
             {
-                List<ResponseRoomDto> listRoom = new List<ResponseRoomDto>();
                 var rooms = _roomRepository.FilterRoom(startDate, endDate, numberPeople, city);
-                //List<ResponseRoomDto> listRoom = rooms.Select(room => new ResponseRoomDto()
-                //{
-                //    Id = room.Id,
-                //    HotelName = room.Hotel.HotelName,
-                //    RoomEspecification = room.RoomType.RoomEspecification,
-                //    Capacity = room.RoomType.Capacity,
-                //    price = room.BaseCost + room.Taxes
-                //});
-                foreach (var room in rooms)
+                List<ResponseRoomDto> listRoom = rooms.Select(room => new ResponseRoomDto()
                 {
-                    ResponseRoomDto responseRoom = new ResponseRoomDto()
-                    {
-                        Id = room.Id,
-                        HotelName = room.Hotel.HotelName,
-                        RoomEspecification = room.RoomType.RoomEspecification,
-                        Capacity = room.RoomType.Capacity,
-                        price = room.BaseCost + room.Taxes
-                    };
-                    listRoom.Add(responseRoom);
-                }
+                    Id = room.Id,
+                    HotelName = room.Hotel.HotelName,
+                    RoomEspecification = room.RoomType.RoomEspecification,
+                    Capacity = room.RoomType.Capacity,
+                    price = room.BaseCost + room.Taxes
+                }).ToList();
                 response.Result = listRoom;
             }
             catch (Exception ex)

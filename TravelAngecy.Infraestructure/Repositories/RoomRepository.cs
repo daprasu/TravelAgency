@@ -50,11 +50,11 @@ namespace TravelAngecy.Infraestructure.Repositories
         }
         public List<Room> FilterRoom(DateTime startDate, DateTime endDate, int numberPeople, string city)
         {
-            var reservation = _context.Reservation.Where(x=> x.StartDate >= startDate && x.EndDate <= endDate).Select(x=> x.RoomId).ToList();
+            var reservation = _context.Reservation.Where(x=> x.StartDate.Date >= startDate.Date && x.EndDate.Date <= endDate.Date).Select(x=> x.RoomId).ToList();
             var listRoom = _context.Room.Include(x => x.RoomType)
                 .Include(x => x.Hotel)
                 .Include(x => x.Reservation)
-                .Where(x => x.Hotel.City.ToLower().Equals(city.ToLower()) && x.RoomType.Capacity >= numberPeople).ToList();
+                .Where(x => x.Hotel.City.ToLower().Equals(city.ToLower()) && x.RoomType.Capacity >= numberPeople && x.Enabled.Equals(true)).ToList();
 
             listRoom.RemoveAll(z => reservation.Contains(z.Id));
 

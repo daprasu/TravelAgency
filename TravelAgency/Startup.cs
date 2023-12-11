@@ -6,7 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using System;
+using System.IO;
 using TravelAgency.Core.ApplicationContracts;
+using TravelAgency.Core.DTOs;
 using TravelAgency.Core.RepositoriesContracts;
 using TravelAgency.Infraestructure.Repositories;
 using TravelAngecy.Infraestructure.Application;
@@ -33,6 +35,21 @@ namespace TravelAgency
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "TravelAgency", Version = "v1" });
+                DirectoryInfo directoryFiles = new DirectoryInfo(AppContext.BaseDirectory);
+                FileInfo[] filesDirectory = directoryFiles.GetFiles("*.xml", SearchOption.AllDirectories);
+                foreach (var item in filesDirectory)
+                {
+                    c.IncludeXmlComments(item.FullName, true);
+                }
+            });
+            services.AddCors(opt =>
+            {
+                opt.AddPolicy("Default_CorsPolicy", o =>
+                {
+                    o.AllowAnyHeader();
+                    o.AllowAnyMethod();
+                    o.AllowAnyOrigin();
+                });
             });
             // Automapper
             services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
@@ -51,17 +68,20 @@ namespace TravelAgency
             services.AddTransient<IGuestRepository, GuestRepository>();
             // validation required fields
             services.AddResponseParametersValidation();
+            // Email Configuration
+            services.Configure<EmailConfiguration>(options => Configuration.GetSection("EmailConfiguration").Bind(options));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "TravelAgency v1"));
-            }
+
+            app.UseDeveloperExceptionPage();
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "TravelAgency v1"));
+
+
+            app.UseCors("Default_CorsPolicy");
 
             app.UseHttpsRedirection();
 

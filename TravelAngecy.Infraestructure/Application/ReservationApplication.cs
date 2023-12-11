@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,22 +15,26 @@ namespace TravelAngecy.Infraestructure.Application
 {
     public class ReservationApplication : IReservationApplication
     {
+
         #region Fields
         private readonly IReservationRepository _reservationRepository;
         private readonly IRoomRepository _roomRepository;
         private readonly IGuestRepository _guestRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly EmailConfiguration _emailConfiguration;
         private readonly IMapper _mapper;
-        private readonly string EMAIL_SEND = "daprasu25@gmail.com";
-        private readonly string PASSWORD_SEND = "Cristian_93";
+        private const string CODE_ADMIN = "Admin";
         #endregion
 
         #region Builders
-        public ReservationApplication(IReservationRepository reservationRepository, IRoomRepository roomRepository, IGuestRepository guestRepository, IMapper mapper)
+        public ReservationApplication(IReservationRepository reservationRepository, IRoomRepository roomRepository, IGuestRepository guestRepository, IUserRepository userRepository, IMapper mapper, IOptions<EmailConfiguration> emailConfiguration)
         {
             _reservationRepository = reservationRepository;
             _guestRepository = guestRepository;
             _roomRepository = roomRepository;
+            _userRepository = userRepository;
             _mapper = mapper;
+            _emailConfiguration = emailConfiguration.Value;
         }
         #endregion
 
@@ -53,7 +58,7 @@ namespace TravelAngecy.Infraestructure.Application
 
                         // Send Email
                         string body = "Hello " + reservation.Guest.FirstOrDefault().FirstName + " " + reservation.Guest.FirstOrDefault().FirstSurname + ".\n\nBelow you can find the details of your reservation:\n\n" +
-                            "Room type: " + reservation.Room.RoomType.RoomEspecification + ".\n\nArrival date: " + reservation.StartDate + ".\n\nExit date: " + reservation.EndDate + ".\n\nNumber of guests: " + reservation.NumberPeople;
+                            "Room type: " + reservation.Room.RoomType.RoomEspecification + ".\n\nArrival date: " + reservation.StartDate.Date + ".\n\nExit date: " + reservation.EndDate.Date + ".\n\nNumber of guests: " + reservation.NumberPeople;
                        
                         string subject = "Reservation confirmation in the hotel " + room.Hotel.HotelName;
                         
@@ -82,11 +87,16 @@ namespace TravelAngecy.Infraestructure.Application
         public ResponseQuery<List<ListReservationDto>> GetReservationByUserId(int userId)
         {
             ResponseQuery<List<ListReservationDto>> response = new ResponseQuery<List<ListReservationDto>>();
-            List<ListReservationDto> listReservations = new List<ListReservationDto>();
-            var reservations = _reservationRepository.GetReservationByUserId(userId);
-            foreach (var reservation in reservations)
+            var administrador = _userRepository.GetUserByCode(userId);
+            if(!administrador.Code.ToLower().Equals(CODE_ADMIN.ToLower()))
             {
-                ListReservationDto listReservation = new ListReservationDto()
+                response.ResponseMessage("This user could not access this function", false);
+                return response;
+            }
+            try
+            {
+                var reservations = _reservationRepository.GetReservationByUserId(userId);
+                List<ListReservationDto> listReservations = reservations.Select(reservation => new ListReservationDto()
                 {
                     Id = reservation.Id,
                     HotelName = reservation.Room.Hotel.HotelName,
@@ -96,86 +106,96 @@ namespace TravelAngecy.Infraestructure.Application
                     NumberPeople = reservation.NumberPeople,
                     StartDate = reservation.StartDate,
                     EndDate = reservation.EndDate,
-                };
-                listReservations.Add(listReservation);
+                }).ToList();
+                response.ResponseMessage("Susccefull", true);
+                response.Result = listReservations;
             }
-            response.ResponseMessage("Susccefull", true);
-            response.Result = listReservations;
+            catch (Exception ex)
+            {
+                response.ResponseMessage("System Error", false, ex.Message);
+            }
             return response;
         }
         public ResponseQuery<ResponseReservationDto> GetReservationByReservationId(int reservationId)
         {
             ResponseQuery<ResponseReservationDto> response = new ResponseQuery<ResponseReservationDto>();
-            var reservation = _reservationRepository.GetReservationByReservationId(reservationId);
-            ReservationDto reservationDto = new ReservationDto()
+            try
             {
-                Id = reservation.Id,
-                Cost = reservation.Cost,
-                StartDate = reservation.StartDate,
-                EndDate = reservation.EndDate,
-                NumberPeople = reservation.NumberPeople
-            };
-            RoomDto roomDto = new RoomDto()
+                var reservation = _reservationRepository.GetReservationByReservationId(reservationId);
+                ReservationDto reservationDto = new ReservationDto()
+                {
+                    Id = reservation.Id,
+                    Cost = reservation.Cost,
+                    StartDate = reservation.StartDate,
+                    EndDate = reservation.EndDate,
+                    NumberPeople = reservation.NumberPeople
+                };
+                RoomDto roomDto = new RoomDto()
+                {
+                    Id = reservation.Room.Id,
+                    RoomCode = reservation.Room.RoomCode,
+                    BaseCost = reservation.Room.BaseCost,
+                    Taxes = reservation.Room.Taxes,
+                    Floor = reservation.Room.Floor,
+                    Enabled = reservation.Room.Enabled
+                };
+                List<GuestDto> listGuest = reservation.Guest.Select(guest => new GuestDto()
+                {
+                    Id = guest.Id,
+                    FirstName = guest.FirstName,
+                    SecondName = guest.SecondName,
+                    FirstSurname = guest.FirstSurname,
+                    SecondSurname = guest.SecondSurname,
+                    Gender = guest.Gender,
+                    DocumentTypeId = guest.DocumentTypeId,
+                    DocumentNumber = guest.DocumentNumber,
+                    Email = guest.Email,
+                    PhoneNumber = guest.PhoneNumber,
+                    EmergencyContact = guest.EmergencyContact,
+                    EmergencyNumber = guest.EmergencyNumber,
+                    UserId = guest.UserId
+                }).ToList();
+                ResponseReservationDto responseReservation = new ResponseReservationDto()
+                {
+                    Reservation = reservationDto,
+                    Room = roomDto,
+                    RoomEspecification = reservation.Room.RoomType.RoomEspecification,
+                    HotelName = reservation.Room.Hotel.HotelName,
+                    Guest = listGuest
+                };
+                response.ResponseMessage("Susccefull", true);
+                response.Result = responseReservation;
+            }
+            catch (Exception ex)
             {
-                Id= reservation.Room.Id,
-                RoomCode= reservation.Room.RoomCode,
-                BaseCost = reservation.Room.BaseCost,
-                Taxes = reservation.Room.Taxes,
-                Floor = reservation.Room.Floor,
-                Enabled = reservation.Room.Enabled
-            };
-            List<GuestDto> listGuest = reservation.Guest.Select(guest=> new GuestDto()
-            {
-                Id = guest.Id,
-                FirstName = guest.FirstName,
-                SecondName = guest.SecondName,
-                FirstSurname = guest.FirstSurname,
-                SecondSurname = guest.SecondSurname,
-                Gender= guest.Gender,
-                DocumentTypeId = guest.DocumentTypeId,
-                DocumentNumber = guest.DocumentNumber, 
-                Email = guest.Email,
-                PhoneNumber = guest.PhoneNumber,
-                EmergencyContact = guest.EmergencyContact,
-                EmergencyNumber = guest.EmergencyNumber,
-                UserId = guest.UserId
-            }).ToList();
-            ResponseReservationDto responseReservation = new ResponseReservationDto()
-            {
-                Reservation = reservationDto,
-                Room = roomDto,
-                RoomEspecification = reservation.Room.RoomType.RoomEspecification,
-                HotelName = reservation.Room.Hotel.HotelName,
-                Guest = listGuest
-            };
-            response.ResponseMessage("Susccefull", true);
-            response.Result = responseReservation;
+                response.ResponseMessage("System Error", false, ex.Message);
+            }
             return response;
         }
 
         public void SendEmail(string guestEmail, string subject, string body)
         {
             // Configura la información del servidor SMTP
-            var smtpCliente = new SmtpClient("smtp.gmail.com")
+            var smtpCliente = new SmtpClient(_emailConfiguration.SmtpServer)
             {
-                Port = 587,
-                Credentials = new NetworkCredential(EMAIL_SEND, PASSWORD_SEND),
+                Port = _emailConfiguration.Port,
+                Credentials = new NetworkCredential(_emailConfiguration.From, _emailConfiguration.Password),
                 EnableSsl = true,
             };
 
             // Configura el correo electrónico
             var message = new MailMessage
             {
-                From = new MailAddress(EMAIL_SEND),
+                From = new MailAddress(_emailConfiguration.From),
                 Subject = subject,
                 Body = body,
-                IsBodyHtml = true,
+                IsBodyHtml = false,
             };
 
             // Agrega el destinatario
             message.To.Add(guestEmail);
 
-            message.CC.Add(EMAIL_SEND);
+            message.CC.Add(_emailConfiguration.From);
 
             // Envía el correo electrónico
             smtpCliente.Send(message);
